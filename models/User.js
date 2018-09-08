@@ -2,8 +2,8 @@ const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
 const schema = new Schema({
-  face: { type: [Object], required: true },
-  telephone: { type: Number, unique: true, required: true },
+  face: { type: Array, required: true },
+  telephone: { type: String, unique: true, required: true },
   atm: { type: String },
   timestamp: { type: Number, default: Date.now },
 })

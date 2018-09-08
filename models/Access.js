@@ -5,7 +5,7 @@ const schema = new Schema({
   timestamp: { type: Date, default: Date.now },
   success: Boolean,
   atm: String,
-  face: [Object],
+  face: Array,
   user: { type: Schema.Types.ObjectId, ref: 'User' },
   status: Number,
 })
