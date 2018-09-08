@@ -2,19 +2,18 @@
 const path = require('path')
 const crypto = require('crypto')
 const express = require('express')
-const winston = require('winston')
 const router = new express.Router()
 const base64Img = require('base64-img')
 const shortid = require('shortid')
 const multer = require('multer')
 const mime = require('mime')
 
+var AWS = require('aws-sdk')
+// Set region
+AWS.config.update({ region: 'us-east-1' })
+
 const User = require(path.resolve('models/User'))
 const Access = require(path.resolve('models/Access'))
-
-const accountSid = 'AC260d1f6cd0223a3fb5c65add04cdb93e'
-const authToken = '2e12a9ceec77790c6a4223abd0865e82'
-const client = require('twilio')(accountSid, authToken)
 
 const storage = multer.diskStorage({
   destination: (req, file, callback) => callback(null, 'static/uploads'),
@@ -68,7 +67,7 @@ router.route('/users/recognize/one-to-one').post((req, res) => {
       // Insert access
       return new Access({ ...access }).save((error, access) => {
         if (error) {
-          winston.error(error)
+          console.error(error)
           return res
             .status(500)
             .json({ success: false, message: 'Could not save access log.' })
@@ -82,7 +81,7 @@ router.route('/users/recognize/one-to-one').post((req, res) => {
 // 1 to many (ask for which phone 'this' face has)
 router
   .route('/users/recognize/one-to-many')
-  .post(upload.single('photo'), (req, res) => {
+  .post(upload.single('photo'), async (req, res) => {
     const { atm } = req.body
     const photo = req.file
 
@@ -100,39 +99,42 @@ router
       success: true,
       face: [[12, 32], [82, 21]],
       status: 200,
+      telephone: '+525581452376',
     }
     const access = {
       ...response,
       atm,
     }
     // Insert access
-    return new Access({ ...access }).save((error, access) => {
-      if (error) {
-        winston.error(error)
-        return res
-          .status(500)
-          .json({ success: false, message: 'Could not save access log.' })
-      }
+    try {
+      await new Access(access).save()
 
-      return client.messages
-        .create({
-          body: 'Here is receipt information',
-          from: '+17653004272',
-          to: '+525581452376',
-          mediaUrl:
-            'https://drive.google.com/open?id=1bHWBDdbabk9EKkY64FZpFfZiS9UdTRap',
+      // Create publish parameters
+      // Create promise and SNS service object
+      const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
+        .publish({
+          Message:
+            'Hello there. Here is your receipt: https://drive.google.com/open?id=1bHWBDdbabk9EKkY64FZpFfZiS9UdTRap' /* required */,
+          PhoneNumber: response.telephone,
         })
-        .then((message) => {
-          console.log(message)
-          if (error) {
-            winston.error(error)
-            return res
-              .status(500)
-              .json({ success: false, message: 'Could not send message' })
-          }
-          return res.status(response.status).json({ access, message })
+        .promise()
+
+      // Handle promise's fulfilled/rejected states
+      publishTextPromise
+        .then((data) => {
+          console.log('MessageID is ' + data.MessageId)
         })
-    })
+        .catch((err) => {
+          console.error(err, err.stack)
+        })
+
+      return res.status(response.status).json({ access })
+    } catch (error) {
+      console.error(error)
+      return res
+        .status(500)
+        .json({ success: false, message: 'Could not save access log.' })
+    }
   })
 
 // Register (stablish a relation between a face and a telephone)
@@ -146,7 +148,7 @@ router.route('/users/signup').post((req, res) => {
   // Check that the telephone is not already registered. TODO: Not just mark as an invalid request
   return User.findOne({ telephone }).exec((error, user) => {
     if (error) {
-      winston.error(error)
+      console.error(error)
       return res.status(500).json({
         success: false,
         message: 'Error while looking for user',
@@ -173,7 +175,7 @@ router.route('/users/signup').post((req, res) => {
         return new User({ ...user }).save((error, user) => {
           // Save the user form
           if (error) {
-            winston.error(error)
+            console.error(error)
             return res.status(500).json({
               success: false,
               message: 'Error while saving user',
