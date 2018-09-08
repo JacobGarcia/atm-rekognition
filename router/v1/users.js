@@ -15,8 +15,7 @@ AWS.config.update({ region: 'us-east-1' })
 const User = require(path.resolve('models/User'))
 const Access = require(path.resolve('models/Access'))
 
-// TODO: Upload to S3 bucket
-// TODO: Create bucket for each client
+// TODO: Refactor
 const storage = multer.diskStorage({
   destination: (req, file, callback) => callback(null, 'static/uploads'),
   filename: (req, file, callback) => {
@@ -76,6 +75,16 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
       success: false,
       message: 'Malformed Request. Face or receipt not specified',
     })
+
+  // call Alejin's service for facial recognition. Now using stub
+  // use PythonShell to call python instance ?
+  const response = {
+    user: '507f1f77bcf86cd799439011',
+    success: true,
+    face: [[12, 32], [82, 21]],
+    status: 200,
+    telephone: '+525581452376',
+  }
   // Upload receipt to S3
   fs.readFile(receipt[0].path, (error, data) => {
     if (error) {
@@ -87,7 +96,7 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
     s3.putObject(
       {
         Bucket: 'nonbancomerclients',
-        Key: receipt[0].filename,
+        Key: response.telephone + '/' + receipt[0].filename,
         Body: base64data,
         ACL: 'public-read',
       },
@@ -99,16 +108,6 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
       }
     )
   })
-
-  // call Alejin's service for facial recognition. Now using stub
-  // use PythonShell to call python instance ?
-  const response = {
-    user: '507f1f77bcf86cd799439011',
-    success: true,
-    face: [[12, 32], [82, 21]],
-    status: 200,
-    telephone: '+525581452376',
-  }
   const access = {
     ...response,
     atm,
@@ -181,7 +180,7 @@ router.route('/users/signup').post(upload, (req, res) => {
     s3.putObject(
       {
         Bucket: 'nonbancomerclients',
-        Key: receipt[0].filename,
+        Key: telephone + '/' + receipt[0].filename,
         Body: base64data,
         ACL: 'public-read',
       },
