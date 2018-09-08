@@ -48,12 +48,12 @@ class App extends PureComponent {
         <AppBar position="static" color="default">
           <Toolbar>
             <Typography variant="title" color="inherit">
-              Demo for code extraction
+              BBVA Bancomer
             </Typography>
           </Toolbar>
         </AppBar>
         <div className="content">
-          <Input type="file" onChange={this.onChange} />
+          <Input type="text" onChange={this.onChange} />
           <Button
             variant="contained"
             color="primary"

@@ -106,12 +106,10 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
       (error) => {
         if (error) {
           console.error(error)
-          return res
-            .status(500)
-            .json({
-              success: false,
-              message: 'Could not put object to S3 bucket.',
-            })
+          return res.status(500).json({
+            success: false,
+            message: 'Could not put object to S3 bucket.',
+          })
         }
         return console.log('Successfully uploaded package.')
       }
@@ -218,8 +216,8 @@ router.route('/users/signup').post(upload, (req, res) => {
     // Call Python to register user
     const response = {
       face: [[12, 32], [82, 21]],
-      telephone,
     }
+
     // Get S3 URL File
     const s3url = s3.getSignedUrl('getObject', {
       Bucket: 'nonbancomerclients',
@@ -227,6 +225,7 @@ router.route('/users/signup').post(upload, (req, res) => {
     })
     const user = {
       ...response,
+      telephone,
       atm,
       receipts: [s3url],
     }
@@ -266,4 +265,63 @@ router.route('/users/signup').post(upload, (req, res) => {
   })
 })
 
+router.route('/users/sms/verifcation/send').post((req, res) => {
+  // Validate that no field is empty
+  const { telephone } = req.body
+
+  //  Generate 4-digit code
+  const code = Math.floor(Math.random() * 9000 + 1000)
+  const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
+    .publish({
+      Message: 'Your access code is ' + code /* required */,
+      PhoneNumber: telephone,
+    })
+    .promise()
+  // Handle promise's fulfilled/rejected states
+  publishTextPromise
+    .then((data) => {
+      console.log('MessageID is ' + data.MessageId)
+    })
+    .catch((err) => {
+      console.error(err, err.stack)
+    })
+
+  return User.findOneAndUpdate({ telephone }, { $set: { code } }).exec(
+    (error) => {
+      if (error) {
+        console.error(error)
+        return res.status(500).json({
+          success: false,
+          message: 'Error while looking updating user',
+        })
+      }
+      return res
+        .status(200)
+        .json({ success: true, message: 'Sent Verification Code', code })
+    }
+  )
+})
+
+router.route('/users/sms/verifcation/authorize').post((req, res) => {
+  // Validate that no field is empty
+  const { telephone, code } = req.body
+
+  // Check if code matches
+  User.findOne({ telephone }).exec((error, user) => {
+    if (error) {
+      console.error(error)
+      return res.status(500).json({
+        success: false,
+        message: 'Error while looking updating user',
+      })
+    }
+
+    if (parseInt(user.code, 10) === parseInt(code, 10)) return res
+        .status(200)
+        .json({ success: true, message: 'Access given successfully' })
+    return res
+      .status(401)
+      .json({ success: false, message: 'Wrong access code' })
+  })
+})
 module.exports = router

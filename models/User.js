@@ -7,6 +7,7 @@ const schema = new Schema({
   atm: { type: String },
   timestamp: { type: Number, default: Date.now },
   receipts: [String],
+  code: Number,
 })
 
 schema.index({ face: 'text' })
