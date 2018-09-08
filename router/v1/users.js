@@ -88,12 +88,15 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
   // Upload receipt to S3
   fs.readFile(receipt[0].path, (error, data) => {
     if (error) {
-      console.log(error)
+      console.error(error)
+      return res
+        .status(500)
+        .json({ success: false, message: 'Could not read uploaded file' })
     }
 
     const base64data = Buffer.from(data, 'binary')
 
-    s3.putObject(
+    return s3.putObject(
       {
         Bucket: 'nonbancomerclients',
         Key: response.telephone + '/' + receipt[0].filename,
@@ -102,9 +105,15 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
       },
       (error) => {
         if (error) {
-          console.log(error)
+          console.error(error)
+          return res
+            .status(500)
+            .json({
+              success: false,
+              message: 'Could not put object to S3 bucket.',
+            })
         }
-        console.log('Successfully uploaded package.')
+        return console.log('Successfully uploaded package.')
       }
     )
   })
@@ -115,13 +124,14 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
   // Insert access
   try {
     await new Access(access).save()
-    // Create publish parameters
-    // Create promise and SNS service object
     // Get S3 URL File
     const s3url = s3.getSignedUrl('getObject', {
       Bucket: 'nonbancomerclients',
       Key: receipt[0].filename,
     })
+
+    // Create publish parameters
+    // Create promise and SNS service object
     const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
       .publish({
         Message: 'Hello there. Here is your receipt: ' + s3url /* required */,
