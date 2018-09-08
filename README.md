@@ -1,8 +1,8 @@
-# ATM Rekognition
+# React Boilerplate
 
 [![Dependency Status][daviddm-img]][daviddm-url]
 
-API using a greatly optimized React PWA, managing state with Redux, and using a Express server making it ready to support other services.
+Boilerplate to create a greatly optimized React PWA, managing state with Redux, and using a Express server making it ready to support other services.
 
 ## Features
 
