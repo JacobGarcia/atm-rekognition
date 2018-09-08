@@ -1,8 +1,9 @@
 module.exports = {
   project: {
-    name: 'React Boilerplate',
-    shortName: 'React Boilerplate',
-    themeColor: '#ffffff',
-    backgroundColor: '#ffffff',
+    name: 'ATM Rekognition',
+    shortName: 'ATMR',
+    themeColor: '#1d2229',
+    backgroundColor: '#1d2229'
   },
+  databaseUri: process.env.MONGODB_URL || 'mongodb://localhost:27017/rekognition'
 }
