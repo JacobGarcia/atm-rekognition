@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: 'react-boilerplate',
+      name: 'atm-rekognition',
       script: './server.js',
       ignore_watch: ['src', 'node_modules', 'dist'],
       env: {
