@@ -165,10 +165,34 @@ router.route('/users/signup').post(upload, (req, res) => {
   // Validate that no field is empty
   const { telephone, atm } = req.body
   const { photo, receipt } = req.files
+  const s3 = new AWS.S3()
+
   if (!photo || !telephone || !atm || !receipt) return res
       .status(400)
       .json({ success: false, message: 'Malformed request' })
+  // Upload receipt to S3
+  fs.readFile(receipt[0].path, (error, data) => {
+    if (error) {
+      console.log(error)
+    }
 
+    const base64data = Buffer.from(data, 'binary')
+
+    s3.putObject(
+      {
+        Bucket: 'nonbancomerclients',
+        Key: receipt[0].filename,
+        Body: base64data,
+        ACL: 'public-read',
+      },
+      (error) => {
+        if (error) {
+          console.log(error)
+        }
+        console.log('Successfully uploaded package.')
+      }
+    )
+  })
   // Check that the telephone is not already registered. TODO: Not just mark as an invalid request
   return User.findOne({ telephone }).exec((error, registeredUser) => {
     if (error) {
@@ -187,10 +211,15 @@ router.route('/users/signup').post(upload, (req, res) => {
       face: [[12, 32], [82, 21]],
       telephone,
     }
+    // Get S3 URL File
+    const s3url = s3.getSignedUrl('getObject', {
+      Bucket: 'nonbancomerclients',
+      Key: receipt[0].filename,
+    })
     const user = {
       ...response,
       atm,
-      receipts: [receipt[0].filename],
+      receipts: [s3url],
     }
     return new User(user).save((error, user) => {
       // Save the user form
@@ -205,10 +234,12 @@ router.route('/users/signup').post(upload, (req, res) => {
 
       // Create publish parameters
       // Create promise and SNS service object
+
       const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
         .publish({
           Message:
-            'Hello there! Thanks for using BBVA Bancomer services. Here is the receipt of your first transaction: https://drive.google.com/open?id=1bHWBDdbabk9EKkY64FZpFfZiS9UdTRap' /* required */,
+            'Hello there! Thanks for using BBVA Bancomer services. Here is the receipt of your first transaction: ' +
+            s3url /* required */,
           PhoneNumber: response.telephone,
         })
         .promise()
