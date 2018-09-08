@@ -1,6 +1,8 @@
 /* eslint-env node */
 const path = require('path')
 const crypto = require('crypto')
+const fs = require('fs')
+
 const express = require('express')
 const router = new express.Router()
 const multer = require('multer')
@@ -14,7 +16,7 @@ const User = require(path.resolve('models/User'))
 const Access = require(path.resolve('models/Access'))
 
 // TODO: Upload to S3 bucket
-
+// TODO: Create bucket for each client
 const storage = multer.diskStorage({
   destination: (req, file, callback) => callback(null, 'static/uploads'),
   filename: (req, file, callback) => {
@@ -68,11 +70,35 @@ router.route('/users/recognize/one-to-one').post(upload, (req, res) => {
 router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
   const { atm } = req.body
   const { photo, receipt } = req.files
-  console.log(receipt[0].filename)
+  const s3 = new AWS.S3()
+
   if (!photo || !receipt) return res.status(400).json({
       success: false,
       message: 'Malformed Request. Face or receipt not specified',
     })
+  // Upload receipt to S3
+  fs.readFile(receipt[0].path, (error, data) => {
+    if (error) {
+      console.log(error)
+    }
+
+    const base64data = Buffer.from(data, 'binary')
+
+    s3.putObject(
+      {
+        Bucket: 'nonbancomerclients',
+        Key: receipt[0].filename,
+        Body: base64data,
+        ACL: 'public-read',
+      },
+      (error) => {
+        if (error) {
+          console.log(error)
+        }
+        console.log('Successfully uploaded package.')
+      }
+    )
+  })
 
   // call Alejin's service for facial recognition. Now using stub
   // use PythonShell to call python instance ?
@@ -92,10 +118,14 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
     await new Access(access).save()
     // Create publish parameters
     // Create promise and SNS service object
+    // Get S3 URL File
+    const s3url = s3.getSignedUrl('getObject', {
+      Bucket: 'nonbancomerclients',
+      Key: receipt[0].filename,
+    })
     const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
       .publish({
-        Message:
-          'Hello there. Here is your receipt: https://drive.google.com/open?id=1bHWBDdbabk9EKkY64FZpFfZiS9UdTRap' /* required */,
+        Message: 'Hello there. Here is your receipt: ' + s3url /* required */,
         PhoneNumber: response.telephone,
       })
       .promise()
@@ -112,7 +142,7 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
     // Add receipt to User
     return User.findOneAndUpdate(
       { telephone: response.telephone },
-      { $push: { receipts: receipt[0].filename } }
+      { $push: { receipts: s3url } }
     ).exec((error, updatedUser) => {
       if (error) {
         console.error(error)
