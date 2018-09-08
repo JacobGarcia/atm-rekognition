@@ -57,8 +57,8 @@ const app = express() // App definition
 /* App configurations */
 app.use(helmet())
 app.use(hpp())
-app.use(bodyParser.urlencoded({ extended: false }))
-app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ limit: '12mb', extended: true }))
+app.use(bodyParser.json({ limit: '12mb' }))
 app.use('/v1', v1)
 
 if (!isProduction && !SERVER_ONLY) app.use(require(path.resolve('config/webpackDevServer'))) // Use webpackDevServer if development environment
