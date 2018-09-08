@@ -6,6 +6,7 @@ const schema = new Schema({
   telephone: { type: String, unique: true, required: true },
   atm: { type: String },
   timestamp: { type: Number, default: Date.now },
+  receipts: [String],
 })
 
 schema.index({ face: 'text' })
