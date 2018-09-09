@@ -69,7 +69,7 @@ router.route('/users/recognize/one-to-one').post(upload, (req, res) => {
 
 // 1 to many (ask for which phone 'this' face has)
 router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
-  const { atm } = req.body
+  const { atm, institute, transaction, account, ammount, folio } = req.body
   const { photo, receipt } = req.files
   const s3 = new AWS.S3()
 
@@ -134,7 +134,17 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
     // Create promise and SNS service object
     const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
       .publish({
-        Message: 'Hello there. Here is your receipt: ' + s3url /* required */,
+        Message:
+          institute +
+          ' - ' +
+          transaction +
+          ' - CUENTA ' +
+          account +
+          ' - ' +
+          'CANTIDAD $' +
+          ammount +
+          ' - COMPROBANTE OFICIAL ' +
+          s3url /* required */,
         PhoneNumber: response.telephone,
       })
       .promise()
@@ -147,11 +157,18 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
       .catch((err) => {
         console.error(err, err.stack)
       })
-
+    const receipt = {
+      institute,
+      transaction,
+      account,
+      ammount,
+      uri: s3url,
+      folio,
+    }
     // Add receipt to User
     return User.findOneAndUpdate(
       { telephone: response.telephone },
-      { $push: { receipts: s3url } }
+      { $push: { receipts: receipt } }
     ).exec((error, updatedUser) => {
       if (error) {
         console.error(error)
@@ -172,7 +189,15 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
 // Register (stablish a relation between a face and a telephone)
 router.route('/users/signup').post(upload, (req, res) => {
   // Validate that no field is empty
-  const { telephone, atm } = req.body
+  const {
+    telephone,
+    atm,
+    institute,
+    transaction,
+    account,
+    ammount,
+    folio,
+  } = req.body
   const { photo, receipt } = req.files
   const s3 = new AWS.S3()
 
@@ -221,18 +246,24 @@ router.route('/users/signup').post(upload, (req, res) => {
     }
 
     // Get S3 URL File
-    console.log('holi')
-
     const s3url = s3.getSignedUrl('getObject', {
       Bucket: 'nonbancomerclients',
       Key: telephone + '/' + receipt[0].filename,
     })
 
+    const receipt = {
+      institute,
+      transaction,
+      account,
+      ammount,
+      uri: s3url,
+      folio,
+    }
     const user = {
       ...response,
       telephone,
       atm,
-      receipts: [s3url],
+      receipts: [receipt],
     }
     return new User(user).save((error, user) => {
       // Save the user form
@@ -251,7 +282,15 @@ router.route('/users/signup').post(upload, (req, res) => {
       const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
         .publish({
           Message:
-            'Hello there! Thanks for using BBVA Bancomer services. Here is the receipt of your first transaction: ' +
+            institute +
+            ' - ' +
+            transaction +
+            ' - CUENTA ' +
+            account +
+            ' - ' +
+            'CANTIDAD $' +
+            ammount +
+            ' - COMPROBANTE OFICIAL ' +
             s3url /* required */,
           PhoneNumber: user.telephone,
         })
@@ -312,7 +351,7 @@ router.route('/users/sms/verifcation/send').post((req, res) => {
   ).exec((error) => {
     const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
       .publish({
-        Message: 'Your access code is ' + code /* required */,
+        Message: 'Tu código de acceso es ' + code /* required */,
         PhoneNumber: '+52' + telephone,
       })
       .promise()
