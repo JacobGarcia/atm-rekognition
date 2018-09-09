@@ -18,6 +18,7 @@ const schema = new Schema({
     },
   ],
   code: Number,
+  photo: String,
 })
 
 schema.index({ face: 'text' })
