@@ -11,6 +11,8 @@ const jwt = require('jsonwebtoken')
 const config = require(path.resolve('config'))
 
 var AWS = require('aws-sdk')
+var TinyURL = require('tinyurl')
+
 // Set region
 AWS.config.update({ region: 'us-east-1' })
 
@@ -100,7 +102,7 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
 
     return s3.putObject(
       {
-        Bucket: 'nonbancomerclients',
+        Bucket: 'noclientbancomer',
         Key: response.telephone + '/' + receipt[0].filename,
         Body: base64data,
         ACL: 'public-read',
@@ -126,57 +128,58 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
     await new Access(access).save()
     // Get S3 URL File
     const s3url = s3.getSignedUrl('getObject', {
-      Bucket: 'nonbancomerclients',
+      Bucket: 'noclientbancomer',
       Key: response.telephone + '/' + receipt[0].filename,
     })
+    TinyURL.shorten(s3url, (uri) => {
+      // Create publish parameters
+      // Create promise and SNS service object
+      const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
+        .publish({
+          Message:
+            institute +
+            ' - ' +
+            transaction +
+            ' - CUENTA ' +
+            account +
+            ' - ' +
+            'CANTIDAD $' +
+            ammount +
+            ' - COMPROBANTE OFICIAL ' +
+            uri /* required */,
+          PhoneNumber: response.telephone,
+        })
+        .promise()
 
-    // Create publish parameters
-    // Create promise and SNS service object
-    const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
-      .publish({
-        Message:
-          institute +
-          ' - ' +
-          transaction +
-          ' - CUENTA ' +
-          account +
-          ' - ' +
-          'CANTIDAD $' +
-          ammount +
-          ' - COMPROBANTE OFICIAL ' +
-          s3url /* required */,
-        PhoneNumber: response.telephone,
-      })
-      .promise()
-
-    // Handle promise's fulfilled/rejected states
-    publishTextPromise
-      .then((data) => {
-        console.log('MessageID is ' + data.MessageId)
-      })
-      .catch((err) => {
-        console.error(err, err.stack)
-      })
-    const newreceipt = {
-      institute,
-      transaction,
-      account,
-      ammount,
-      uri: s3url,
-      folio,
-    }
-    // Add receipt to User
-    return User.findOneAndUpdate(
-      { telephone: response.telephone },
-      { $push: { receipts: newreceipt } }
-    ).exec((error, updatedUser) => {
-      if (error) {
-        console.error(error)
-        return res
-          .status(500)
-          .json({ success: false, message: 'Could not save update user' })
+      // Handle promise's fulfilled/rejected states
+      publishTextPromise
+        .then((data) => {
+          console.log('MessageID is ' + data.MessageId)
+        })
+        .catch((err) => {
+          console.error(err, err.stack)
+        })
+      const newreceipt = {
+        institute,
+        transaction,
+        account,
+        ammount,
+        uri,
+        folio,
       }
-      return res.status(response.status).json({ access, updatedUser })
+      // Add receipt to User
+      return User.findOneAndUpdate(
+        { telephone: response.telephone },
+        { $push: { receipts: newreceipt } }
+      ).exec((error, updatedUser) => {
+        if (error) {
+          console.error(error)
+          return res
+            .status(500)
+            .json({ success: false, message: 'Could not save update user' })
+        }
+        return res.status(response.status).json({ access, updatedUser })
+      })
     })
   } catch (error) {
     console.error(error)
@@ -214,7 +217,7 @@ router.route('/users/signup').post(upload, (req, res) => {
 
     s3.putObject(
       {
-        Bucket: 'nonbancomerclients',
+        Bucket: 'noclientbancomer',
         Key: telephone + '/' + receipt[0].filename,
         Body: base64data,
         ACL: 'public-read',
@@ -247,64 +250,66 @@ router.route('/users/signup').post(upload, (req, res) => {
 
     // Get S3 URL File
     const s3url = s3.getSignedUrl('getObject', {
-      Bucket: 'nonbancomerclients',
+      Bucket: 'noclientbancomer',
       Key: telephone + '/' + receipt[0].filename,
     })
 
-    const newreceipt = {
-      institute,
-      transaction,
-      account,
-      ammount,
-      uri: s3url,
-      folio,
-    }
-    const user = {
-      ...response,
-      telephone,
-      atm,
-      receipts: [newreceipt],
-    }
-    return new User(user).save((error, user) => {
-      // Save the user form
-      if (error) {
-        console.error(error)
-        return res.status(500).json({
-          success: false,
-          message: 'Error while saving user',
-          error,
-        })
+    TinyURL.shorten(s3url, (uri) => {
+      const newreceipt = {
+        institute,
+        transaction,
+        account,
+        ammount,
+        uri,
+        folio,
       }
-      console.log(user)
+      const user = {
+        ...response,
+        telephone,
+        atm,
+        receipts: [newreceipt],
+      }
+      return new User(user).save((error, user) => {
+        // Save the user form
+        if (error) {
+          console.error(error)
+          return res.status(500).json({
+            success: false,
+            message: 'Error while saving user',
+            error,
+          })
+        }
+        console.log(user)
 
-      // Create publish parameters
-      // Create promise and SNS service object
-      const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
-        .publish({
-          Message:
-            institute +
-            ' - ' +
-            transaction +
-            ' - CUENTA ' +
-            account +
-            ' - ' +
-            'CANTIDAD $' +
-            ammount +
-            ' - COMPROBANTE OFICIAL ' +
-            s3url /* required */,
-          PhoneNumber: user.telephone,
-        })
-        .promise()
+        // Create publish parameters
+        // Create promise and SNS service object
+        const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
+          .publish({
+            Message:
+              institute +
+              ' - ' +
+              transaction +
+              ' - CUENTA ' +
+              account +
+              ' - ' +
+              'CANTIDAD $' +
+              ammount +
+              ' - COMPROBANTE OFICIAL ' +
+              uri /* required */,
+            PhoneNumber: user.telephone,
+          })
+          .promise()
 
-      // Handle promise's fulfilled/rejected states
-      publishTextPromise
-        .then((data) => {
-          console.log('MessageID is ' + data.MessageId)
-        })
-        .catch((err) => {
-          console.error(err, err.stack)
-        })
-      return res.status(200).json({ user })
+        // Handle promise's fulfilled/rejected states
+        publishTextPromise
+          .then((data) => {
+            console.log('MessageID is ' + data.MessageId)
+          })
+          .catch((err) => {
+            console.error(err, err.stack)
+          })
+        return res.status(200).json({ user })
+      })
     })
   })
 })

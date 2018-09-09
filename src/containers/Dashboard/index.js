@@ -88,14 +88,14 @@ class Dashboard extends PureComponent {
                   state.receipts.map((receipt) => {
                     return (
                       <TableRow key={receipt}>
-                        <TableCell component="th" scope="row">
-                          <TableCell numeric>
-                            {receipt.timestamp.toLocaleDateString()}
-                          </TableCell>
-                          <TableCell>{receipt.transaction}</TableCell>
-                          <TableCell>{receipt.account}</TableCell>
-                          <TableCell numeric>{receipt.ammount}</TableCell>
-                          <TableCell numeric>{receipt.folio}</TableCell>
+                        <TableCell>
+                          {new Date(receipt.timestamp).toLocaleDateString()}
+                        </TableCell>
+                        <TableCell>{receipt.transaction}</TableCell>
+                        <TableCell>{receipt.account}</TableCell>
+                        <TableCell numeric>{receipt.ammount}</TableCell>
+                        <TableCell numeric>
+                          <a href={receipt.uri}>{receipt.folio}</a>
                         </TableCell>
                       </TableRow>
                     )
