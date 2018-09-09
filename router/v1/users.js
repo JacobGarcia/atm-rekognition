@@ -81,124 +81,146 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
       message: 'Malformed Request. Face or receipt not specified',
     })
 
-  // Find all users
-  // User.find({})
-  // .exec((error, users) => {
-  //   if (error) {
-  //     console.error(error)
-  //     return res
-  //       .status(500)
-  //       .json({ success: false, message: 'Could not read uploaded file' })
-  //   }
-  //   users.map((user) => {
-  //
-  //   })
-  // })
-  const response = {
-    user: '507f1f77bcf86cd799439011',
-    success: true,
-    face: [[12, 32], [82, 21]],
-    status: 200,
-    telephone: '+527223632083',
-  }
-  // Upload receipt to S3
-  fs.readFile(receipt[0].path, (error, data) => {
+  // Find all users photos
+  User.find({}).exec((error, users) => {
     if (error) {
       console.error(error)
       return res
         .status(500)
         .json({ success: false, message: 'Could not read uploaded file' })
     }
+    let isFaceRecognized = false
+    let theIndex = null
+    users.map((user, index) => {
+      const formData = {
+        file: fs.createReadStream(user.photo),
+        file1: fs.createReadStream(photo[0].path),
+      }
+      request.post(
+        { url: 'http://10.10.0.248/compare', formData },
+        (error, resp, body) => {
+          if (error) {
+            console.error(error)
+            return res
+              .status(500)
+              .json({ success: false, message: 'Could not read uploaded file' })
+          }
+          if (JSON.parse(body).success) {
+            isFaceRecognized = true
+            theIndex = index
+          }
+        }
+      )
+    })
 
-    const base64data = Buffer.from(data, 'binary')
+    if (!isFaceRecognized) return res.status(404).json({ success: false, message: 'Face not found' })
 
-    return s3.putObject(
-      {
+    const response = {
+      user: users[theIndex],
+      success: true,
+      face: users.face,
+      status: 200,
+      telephone: users.telephone,
+    }
+    // Upload receipt to S3
+    fs.readFile(receipt[0].path, (error, data) => {
+      if (error) {
+        console.error(error)
+        return res
+          .status(500)
+          .json({ success: false, message: 'Could not read uploaded file' })
+      }
+
+      const base64data = Buffer.from(data, 'binary')
+
+      return s3.putObject(
+        {
+          Bucket: 'noclientbancomer',
+          Key: response.telephone + '/' + receipt[0].filename,
+          Body: base64data,
+          ACL: 'public-read',
+        },
+        (error) => {
+          if (error) {
+            console.error(error)
+            return res.status(500).json({
+              success: false,
+              message: 'Could not put object to S3 bucket.',
+            })
+          }
+          return console.log('Successfully uploaded package.')
+        }
+      )
+    })
+    const access = {
+      ...response,
+      atm,
+    }
+    // Insert access
+    try {
+      new Access(access).save()
+      // Get S3 URL File
+      const s3url = s3.getSignedUrl('getObject', {
         Bucket: 'noclientbancomer',
         Key: response.telephone + '/' + receipt[0].filename,
-        Body: base64data,
-        ACL: 'public-read',
-      },
-      (error) => {
-        if (error) {
-          console.error(error)
-          return res.status(500).json({
-            success: false,
-            message: 'Could not put object to S3 bucket.',
-          })
-        }
-        return console.log('Successfully uploaded package.')
-      }
-    )
-  })
-  const access = {
-    ...response,
-    atm,
-  }
-  // Insert access
-  try {
-    await new Access(access).save()
-    // Get S3 URL File
-    const s3url = s3.getSignedUrl('getObject', {
-      Bucket: 'noclientbancomer',
-      Key: response.telephone + '/' + receipt[0].filename,
-    })
-    return TinyURL.shorten(s3url, (uri) => {
-      // Create publish parameters
-      // Create promise and SNS service object
-      const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
-        .publish({
-          Message:
-            institute +
-            ' - ' +
-            transaction +
-            ' - CUENTA ' +
-            account +
-            ' - ' +
-            'CANTIDAD $' +
-            ammount +
-            ' - COMPROBANTE OFICIAL ' +
-            uri /* required */,
-          PhoneNumber: response.telephone,
-        })
-        .promise()
-
-      // Handle promise's fulfilled/rejected states
-      publishTextPromise
-        .then((data) => {
-          console.log('MessageID is ' + data.MessageId)
-        })
-        .catch((err) => {
-          console.error(err, err.stack)
-        })
-      const newreceipt = {
-        institute,
-        transaction,
-        account,
-        ammount,
-        uri,
-        folio,
-      }
-      // Add receipt to User
-      return User.findOneAndUpdate(
-        { telephone: response.telephone },
-        { $push: { receipts: newreceipt } }
-      ).exec((error, updatedUser) => {
-        if (error) {
-          console.error(error)
-          return res
-            .status(500)
-            .json({ success: false, message: 'Could not save update user' })
-        }
-        return res.status(response.status).json({ access, updatedUser })
       })
-    })
-  } catch (error) {
-    console.error(error)
-    return res
-      .status(500)
-      .json({ success: false, message: 'Could not save access log.' })
-  }
+      return TinyURL.shorten(s3url, (uri) => {
+        // Create publish parameters
+        // Create promise and SNS service object
+        const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
+          .publish({
+            Message:
+              institute +
+              ' - ' +
+              transaction +
+              ' - CUENTA ' +
+              account +
+              ' - ' +
+              'CANTIDAD $' +
+              ammount +
+              ' - COMPROBANTE OFICIAL ' +
+              uri /* required */,
+            PhoneNumber: response.telephone,
+          })
+          .promise()
+
+        // Handle promise's fulfilled/rejected states
+        publishTextPromise
+          .then((data) => {
+            console.log('MessageID is ' + data.MessageId)
+          })
+          .catch((err) => {
+            console.error(err, err.stack)
+          })
+        const newreceipt = {
+          institute,
+          transaction,
+          account,
+          ammount,
+          uri,
+          folio,
+        }
+        // Add receipt to User
+        return User.findOneAndUpdate(
+          { telephone: response.telephone },
+          { $push: { receipts: newreceipt } }
+        ).exec((error, updatedUser) => {
+          if (error) {
+            console.error(error)
+            return res
+              .status(500)
+              .json({ success: false, message: 'Could not save update user' })
+          }
+          return res.status(response.status).json({ access, updatedUser })
+        })
+      })
+    } catch (err) {
+      console.error(err)
+      return res
+        .status(500)
+        .json({ success: false, message: 'Could not save access log.' })
+    }
+  })
 })
 
 // Register (stablish a relation between a face and a telephone)
@@ -291,6 +313,7 @@ router.route('/users/signup').post(upload, (req, res) => {
             telephone,
             atm,
             receipts: [newreceipt],
+            photo: photo[0].path,
           }
           return new User(user).save((error, user) => {
             // Save the user form
