@@ -20,8 +20,17 @@ axios.interceptors.request.use(
 )
 
 class NetworkOperation {
-  static login(email, password) {
-    return axios.post(`${baseUrl}/authenticate`, { email, password })
+  static sendVerficationCode(telephone) {
+    return axios.post(`${baseUrl}/users/sms/verifcation/send`, {
+      telephone,
+    })
+  }
+
+  static authorize(telephone, code) {
+    return axios.post(`${baseUrl}/users/sms/verifcation/authorize`, {
+      telephone,
+      code,
+    })
   }
 }
 

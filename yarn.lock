@@ -673,6 +673,13 @@
     recompose "^0.29.0"
     warning "^4.0.1"
 
+"@material-ui/icons@^3.0.1":
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/@material-ui/icons/-/icons-3.0.1.tgz#671fb3d04dcaf9351dbbd2bf82ae2ae72e3d93cd"
+  dependencies:
+    "@babel/runtime" "7.0.0"
+    recompose "^0.29.0"
+
 "@pm2/agent@^0.5.11":
   version "0.5.13"
   resolved "https://registry.yarnpkg.com/@pm2/agent/-/agent-0.5.13.tgz#e3778413a01ace791527d66b50ff8c3b7b87bcdc"

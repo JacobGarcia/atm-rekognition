@@ -274,7 +274,7 @@ router.route('/users/sms/verifcation/send').post((req, res) => {
   const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
     .publish({
       Message: 'Your access code is ' + code /* required */,
-      PhoneNumber: telephone,
+      PhoneNumber: '+52' + telephone,
     })
     .promise()
   // Handle promise's fulfilled/rejected states
@@ -297,7 +297,7 @@ router.route('/users/sms/verifcation/send').post((req, res) => {
       }
       return res
         .status(200)
-        .json({ success: true, message: 'Sent Verification Code', code })
+        .json({ success: true, message: 'Sent Verification Code' })
     }
   )
 })

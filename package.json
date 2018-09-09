@@ -25,6 +25,7 @@
   "dependencies": {
     "@babel/runtime": "^7.0.0",
     "@material-ui/core": "^3.0.2",
+    "@material-ui/icons": "^3.0.1",
     "aws-sdk": "^2.311.0",
     "axios": "^0.18.0",
     "base64-img": "^1.0.4",

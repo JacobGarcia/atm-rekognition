@@ -1,47 +1,90 @@
 import React, { PureComponent } from 'react'
-import axios from 'axios'
 
 import AppBar from '@material-ui/core/AppBar'
 import Toolbar from '@material-ui/core/Toolbar'
 import Typography from '@material-ui/core/Typography'
 import Input from '@material-ui/core/Input'
 import Button from '@material-ui/core/Button'
-import Card from '@material-ui/core/Card'
-import CardContent from '@material-ui/core/CardContent'
+
+import { createMuiTheme, MuiThemeProvider } from '@material-ui/core/styles'
+import blue from '@material-ui/core/colors/blue'
+
+import NetworkOperation from '../../lib/NetworkOperation'
 
 import './styles.pcss'
+
+const theme = createMuiTheme({
+  palette: {
+    primary: blue,
+  },
+})
 
 class App extends PureComponent {
   static propTypes = {}
 
   state = {
     file: null,
-    code: null,
+    code: false,
+    accesCode: null,
     error: null,
+    phone: null,
   }
 
-  onChange = ({ target }) =>
+  onChange = (event) => {
+    const { value, name } = event.target
+
     this.setState({
-      code: null,
-      file: target.files[0],
+      [name]: value,
+      error: null,
     })
+  }
 
   onSubmit = (event) => {
     event.preventDefault()
 
-    const data = new FormData()
-    data.append('file', this.state.file)
+    NetworkOperation.sendVerficationCode(this.state.phone).then(({ data }) => {
+      console.log(data)
+      this.setState({
+        code: true,
+        telephone: this.state.phone,
+        phone: '',
+        accesCode: '',
+      })
+    })
+  }
 
-    axios
-      .post('http://localhost:8080/extract', data)
-      .then(({ data }) => this.setState({ code: data.code }))
-      .catch((error) => this.setState({ error }))
+  onAccess(event) {
+    event.preventDefault()
+
+    const { telephone, accesCode } = this.state
+
+    NetworkOperation.authorize({ telephone, accesCode })
+      .then(({ data }) => {
+        localStorage.setItem('token', data.token)
+
+        this.props.setCredentials({ ...data.user, token: data.token })
+
+        this.props.history.replace(this.state.return || '/dashboard')
+      })
+      .catch(({ response = {} }) => {
+        const { status = 500 } = response
+        switch (status) {
+          case 400:
+          case 401:
+            this.setState({
+              error: 'Código de autorización incorrecto',
+            })
+            break
+          default:
+            this.setState({
+              error: 'Problemas al iniciar sesión, intenta nuevamente',
+            })
+        }
+      })
   }
 
   render() {
-    const {
-      state: { code },
-    } = this
+    const { state } = this
 
     return (
       <div className="app">
@@ -53,24 +96,49 @@ class App extends PureComponent {
           </Toolbar>
         </AppBar>
         <div className="content">
-          <Input type="text" onChange={this.onChange} />
-          <Button
-            variant="contained"
-            color="primary"
-            type="submit"
-            onClick={this.onSubmit}
-          >
-            Send
-          </Button>
-          {code && (
-            <div>
-              <Card>
-                <CardContent>
-                  The code is: <strong>{code}</strong>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+          <MuiThemeProvider theme={theme}>
+            {!state.code ? (
+              <Input
+                type="text"
+                onChange={this.onChange}
+                name="phone"
+                placeholder="Teléfono"
+                value={state.phone}
+              />
+            ) : (
+              <Input
+                type="text"
+                onChange={this.onChange}
+                name="accesCode"
+                placeholder="Código"
+                value={state.accesCode}
+              />
+            )}
+            {!state.code ? (
+              <Button
+                variant="contained"
+                color="primary"
+                type="submit"
+                onClick={this.onSubmit}
+              >
+                Send Verification Code
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                color="primary"
+                type="submit"
+                onClick={this.onAccess}
+              >
+                Acceder
+              </Button>
+            )}
+            {state.error && (
+              <div className="error">
+                <p>{state.error}</p>
+              </div>
+            )}
+          </MuiThemeProvider>
         </div>
       </div>
     )
