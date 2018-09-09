@@ -90,10 +90,10 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
         .json({ success: false, message: 'Could not read uploaded file' })
     }
     const file = []
+    users.sort() // Sort array alphabetically
     users.map((user) => {
       file.push(fs.createReadStream(user.photo))
     })
-
     const formData = {
       file1: fs.createReadStream(photo[0].path),
       file,
