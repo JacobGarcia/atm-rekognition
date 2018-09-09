@@ -29,6 +29,15 @@ module.exports = merge(common, {
           },
         ],
       },
+      {
+        test: /(\.css|\.scss)$/,
+                use: [{
+                      loader: 'css-loader'
+                  }, {
+                      loader: 'sass-loader'
+                  }],
+                  // use style-loader in development
+        }
     ],
   },
   entry: ['webpack-hot-middleware/client', path.resolve('src/index')],

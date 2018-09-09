@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom'
 import Router from 'router'
 
 import './global.pcss'
+import './styles/master.scss'
 /* eslint-disable */
 const devMode = process.env.NODE_ENV === 'development'
 /* eslint-enable */

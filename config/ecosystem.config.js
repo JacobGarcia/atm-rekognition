@@ -3,7 +3,7 @@ module.exports = {
     {
       name: 'atm-rekognition',
       script: './server.js',
-      ignore_watch: ['src', 'node_modules', 'dist'],
+      watch: ['src', 'router','server'],
       env: {
         NODE_ENV: 'development',
       },

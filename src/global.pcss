@@ -1,5 +1,5 @@
 :root {
-  --tint-color: rgb(0, 176, 251);
+  --tint-color: rgb(10, 79, 164);
 }
 
 html {
@@ -26,9 +26,7 @@ body {
 
 *,
 body,
-div,
 h1,
-h2,
 h3,
 html,
 li,
@@ -41,6 +39,12 @@ ul {
   border: none;
   padding: 0;
   box-sizing: border-box;
+}
+img {
+  flex: 1 1 auto;
+  text-align: center;
+  width: 80px;
+  height: 45px;
 }
 
 body,
@@ -61,9 +65,9 @@ a {
   text-decoration: none;
   color: var(--tint-color);
 }
-
-button,
-input,
+button {
+  margin-top: 10px;
+}
 textarea {
   -webkit-appearance: none;
   font-size: 1rem;
@@ -71,6 +75,32 @@ textarea {
   outline: none;
 }
 
+input {
+  -webkit-appearance: none;
+  font-size: 1rem;
+  padding: 4px 8px;
+  outline: none;
+  width: 100%;
+  height:auto;
+  display: grid;
+}
+
+.contentgeneral {
+  -webkit-appearance: none;
+  font-size: 1rem;
+  padding: 4px 8px;
+  outline: none;
+  width: 100%;
+  height:auto;
+  display: grid;
+}
+.content1 {
+  width: 100%;
+}
+.content2 {
+  padding-top: 100px;
+  width: 100%;
+}
 #app,
 #root,
 body,

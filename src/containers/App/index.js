@@ -11,7 +11,7 @@ import blue from '@material-ui/core/colors/blue'
 
 import PropTypes from 'prop-types'
 import NetworkOperation from '../../lib/NetworkOperation'
-
+import logo from './../../assets/app-bbva.png'
 import './styles.pcss'
 
 const theme = createMuiTheme({
@@ -88,56 +88,62 @@ class App extends PureComponent {
     return (
       <div className="app">
         <AppBar position="static" color="default">
-          <Toolbar>
-            <Typography variant="title" color="inherit">
-              BBVA Bancomer
-            </Typography>
-          </Toolbar>
-        </AppBar>
-        <div className="content">
-          <MuiThemeProvider theme={theme}>
-            {!state.code ? (
-              <Input
-                type="text"
-                onChange={this.onChange}
-                name="phone"
-                placeholder="Teléfono"
-                value={state.phone}
-              />
-            ) : (
-              <Input
-                type="text"
-                onChange={this.onChange}
-                name="accesCode"
-                placeholder="Código"
-                value={state.accesCode}
-              />
-            )}
-            {!state.code ? (
-              <Button
-                variant="contained"
-                color="primary"
-                type="submit"
-                onClick={this.onSubmit}
-              >
-                Send Verification Code
-              </Button>
-            ) : (
-              <Button
-                variant="contained"
-                color="primary"
-                type="submit"
-                onClick={this.onAccess}
-              >
-                Acceder
-              </Button>
-            )}
-            {state.error && (
-              <div className="error">
-                <p>{state.error}</p>
+            <Toolbar>
+              <div className="logocontainer">
+                <img src={logo} />
               </div>
-            )}
-          </MuiThemeProvider>
+            </Toolbar>
+        </AppBar>
+        <div class="contentgeneral">
+          <div class="content1">
+            <MuiThemeProvider theme={theme}>
+              {!state.code ? (
+                <Input
+                  type="text"
+                  onChange={this.onChange}
+                  name="phone"
+                  placeholder="Teléfono"
+                  value={state.phone}
+                />
+              ) : (
+                <Input
+                  type="text"
+                  onChange={this.onChange}
+                  name="accesCode"
+                  placeholder="Código"
+                  value={state.accesCode}
+                />
+              )}
+              </MuiThemeProvider>
+              </div>
+            <div class="content2">
+              <MuiThemeProvider theme={theme}>
+                {!state.code ? (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    type="submit"
+                    onClick={this.onSubmit}
+                  >
+                    Send Verification Code
+                  </Button>
+                ) : (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    type="submit"
+                    onClick={this.onAccess}
+                  >
+                    Acceder
+                  </Button>
+                )}
+                {state.error && (
+                  <div className="error">
+                    <p>{state.error}</p>
+                  </div>
+                )}
+              </MuiThemeProvider>
+          </div>
         </div>
       </div>
     )
