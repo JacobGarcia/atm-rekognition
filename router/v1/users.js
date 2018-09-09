@@ -7,8 +7,12 @@ const express = require('express')
 const router = new express.Router()
 const multer = require('multer')
 const mime = require('mime')
+const jwt = require('jsonwebtoken')
+const config = require(path.resolve('config'))
 
 var AWS = require('aws-sdk')
+var TinyURL = require('tinyurl')
+
 // Set region
 AWS.config.update({ region: 'us-east-1' })
 
@@ -67,7 +71,7 @@ router.route('/users/recognize/one-to-one').post(upload, (req, res) => {
 
 // 1 to many (ask for which phone 'this' face has)
 router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
-  const { atm } = req.body
+  const { atm, institute, transaction, account, ammount, folio } = req.body
   const { photo, receipt } = req.files
   const s3 = new AWS.S3()
 
@@ -83,7 +87,7 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
     success: true,
     face: [[12, 32], [82, 21]],
     status: 200,
-    telephone: '+525581452376',
+    telephone: '+527223632083',
   }
   // Upload receipt to S3
   fs.readFile(receipt[0].path, (error, data) => {
@@ -98,7 +102,7 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
 
     return s3.putObject(
       {
-        Bucket: 'nonbancomerclients',
+        Bucket: 'noclientbancomer',
         Key: response.telephone + '/' + receipt[0].filename,
         Body: base64data,
         ACL: 'public-read',
@@ -124,40 +128,58 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
     await new Access(access).save()
     // Get S3 URL File
     const s3url = s3.getSignedUrl('getObject', {
-      Bucket: 'nonbancomerclients',
+      Bucket: 'noclientbancomer',
       Key: response.telephone + '/' + receipt[0].filename,
     })
+    TinyURL.shorten(s3url, (uri) => {
+      // Create publish parameters
+      // Create promise and SNS service object
+      const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
+        .publish({
+          Message:
+            institute +
+            ' - ' +
+            transaction +
+            ' - CUENTA ' +
+            account +
+            ' - ' +
+            'CANTIDAD $' +
+            ammount +
+            ' - COMPROBANTE OFICIAL ' +
+            uri /* required */,
+          PhoneNumber: response.telephone,
+        })
+        .promise()
 
-    // Create publish parameters
-    // Create promise and SNS service object
-    const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
-      .publish({
-        Message: 'Hello there. Here is your receipt: ' + s3url /* required */,
-        PhoneNumber: response.telephone,
-      })
-      .promise()
-
-    // Handle promise's fulfilled/rejected states
-    publishTextPromise
-      .then((data) => {
-        console.log('MessageID is ' + data.MessageId)
-      })
-      .catch((err) => {
-        console.error(err, err.stack)
-      })
-
-    // Add receipt to User
-    return User.findOneAndUpdate(
-      { telephone: response.telephone },
-      { $push: { receipts: s3url } }
-    ).exec((error, updatedUser) => {
-      if (error) {
-        console.error(error)
-        return res
-          .status(500)
-          .json({ success: false, message: 'Could not save update user' })
+      // Handle promise's fulfilled/rejected states
+      publishTextPromise
+        .then((data) => {
+          console.log('MessageID is ' + data.MessageId)
+        })
+        .catch((err) => {
+          console.error(err, err.stack)
+        })
+      const newreceipt = {
+        institute,
+        transaction,
+        account,
+        ammount,
+        uri,
+        folio,
       }
-      return res.status(response.status).json({ access, updatedUser })
+      // Add receipt to User
+      return User.findOneAndUpdate(
+        { telephone: response.telephone },
+        { $push: { receipts: newreceipt } }
+      ).exec((error, updatedUser) => {
+        if (error) {
+          console.error(error)
+          return res
+            .status(500)
+            .json({ success: false, message: 'Could not save update user' })
+        }
+        return res.status(response.status).json({ access, updatedUser })
+      })
     })
   } catch (error) {
     console.error(error)
@@ -170,7 +192,15 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
 // Register (stablish a relation between a face and a telephone)
 router.route('/users/signup').post(upload, (req, res) => {
   // Validate that no field is empty
-  const { telephone, atm } = req.body
+  const {
+    telephone,
+    atm,
+    institute,
+    transaction,
+    account,
+    ammount,
+    folio,
+  } = req.body
   const { photo, receipt } = req.files
   const s3 = new AWS.S3()
 
@@ -187,7 +217,7 @@ router.route('/users/signup').post(upload, (req, res) => {
 
     s3.putObject(
       {
-        Bucket: 'nonbancomerclients',
+        Bucket: 'noclientbancomer',
         Key: telephone + '/' + receipt[0].filename,
         Body: base64data,
         ACL: 'public-read',
@@ -219,52 +249,97 @@ router.route('/users/signup').post(upload, (req, res) => {
     }
 
     // Get S3 URL File
-    console.log('holi')
-
     const s3url = s3.getSignedUrl('getObject', {
-      Bucket: 'nonbancomerclients',
+      Bucket: 'noclientbancomer',
       Key: telephone + '/' + receipt[0].filename,
     })
 
-    const user = {
-      ...response,
-      telephone,
-      atm,
-      receipts: [s3url],
-    }
-    return new User(user).save((error, user) => {
-      // Save the user form
-      if (error) {
-        console.error(error)
-        return res.status(500).json({
-          success: false,
-          message: 'Error while saving user',
-          error,
-        })
+    TinyURL.shorten(s3url, (uri) => {
+      const newreceipt = {
+        institute,
+        transaction,
+        account,
+        ammount,
+        uri,
+        folio,
       }
-      console.log(user)
+      const user = {
+        ...response,
+        telephone,
+        atm,
+        receipts: [newreceipt],
+      }
+      return new User(user).save((error, user) => {
+        // Save the user form
+        if (error) {
+          console.error(error)
+          return res.status(500).json({
+            success: false,
+            message: 'Error while saving user',
+            error,
+          })
+        }
+        console.log(user)
 
-      // Create publish parameters
-      // Create promise and SNS service object
-      const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
-        .publish({
-          Message:
-            'Hello there! Thanks for using BBVA Bancomer services. Here is the receipt of your first transaction: ' +
-            s3url /* required */,
-          PhoneNumber: user.telephone,
-        })
-        .promise()
+        // Create publish parameters
+        // Create promise and SNS service object
+        const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
+          .publish({
+            Message:
+              institute +
+              ' - ' +
+              transaction +
+              ' - CUENTA ' +
+              account +
+              ' - ' +
+              'CANTIDAD $' +
+              ammount +
+              ' - COMPROBANTE OFICIAL ' +
+              uri /* required */,
+            PhoneNumber: user.telephone,
+          })
+          .promise()
 
-      // Handle promise's fulfilled/rejected states
-      publishTextPromise
-        .then((data) => {
-          console.log('MessageID is ' + data.MessageId)
-        })
-        .catch((err) => {
-          console.error(err, err.stack)
-        })
-      return res.status(200).json({ user })
+        // Handle promise's fulfilled/rejected states
+        publishTextPromise
+          .then((data) => {
+            console.log('MessageID is ' + data.MessageId)
+          })
+          .catch((err) => {
+            console.error(err, err.stack)
+          })
+        return res.status(200).json({ user })
+      })
     })
+  })
+})
+
+router.route('/users/sms/verifcation/authorize').post((req, res) => {
+  // Validate that no field is empty
+  const { telephone, code } = req.body
+  // Check if code matches
+  User.findOne({ telephone: '+52' + telephone }).exec((error, user) => {
+    if (error) {
+      console.error(error)
+      return res.status(500).json({
+        success: false,
+        message: 'Error while looking for user',
+      })
+    }
+
+    const token = jwt.sign(
+      {
+        _id: user._id,
+        telephone: user.telephone,
+      },
+      config.secret
+    )
+    if (parseInt(user.code, 10) === parseInt(code, 10)) return res
+        .status(200)
+        .json({ success: true, message: 'Access given successfully', token })
+    return res
+      .status(401)
+      .json({ success: false, message: 'Wrong access code' })
   })
 })
 
@@ -274,35 +349,69 @@ router.route('/users/sms/verifcation/send').post((req, res) => {
 
   //  Generate 4-digit code
   const code = Math.floor(Math.random() * 9000 + 1000)
-  const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
-    .publish({
-      Message: 'Your access code is ' + code /* required */,
-      PhoneNumber: '+52' + telephone,
-    })
-    .promise()
-  // Handle promise's fulfilled/rejected states
-  publishTextPromise
-    .then((data) => {
-      console.log('MessageID is ' + data.MessageId)
-    })
-    .catch((err) => {
-      console.error(err, err.stack)
-    })
 
-  return User.findOneAndUpdate({ telephone }, { $set: { code } }).exec(
-    (error) => {
-      if (error) {
-        console.error(error)
-        return res.status(500).json({
-          success: false,
-          message: 'Error while looking updating user',
-        })
-      }
-      return res
-        .status(200)
-        .json({ success: true, message: 'Sent Verification Code' })
+  User.findOneAndUpdate(
+    { telephone: '+52' + telephone },
+    { $set: { code } }
+  ).exec((error) => {
+    const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
+      .publish({
+        Message: 'Tu código de acceso es ' + code /* required */,
+        PhoneNumber: '+52' + telephone,
+      })
+      .promise()
+    // Handle promise's fulfilled/rejected states
+    publishTextPromise
+      .then((data) => {
+        console.log('MessageID is ' + data.MessageId)
+      })
+      .catch((err) => {
+        console.error(err, err.stack)
+      })
+    if (error) {
+      console.error(error)
+      return res.status(500).json({
+        success: false,
+        message: 'Error while looking updating user',
+      })
     }
+    return res
+      .status(200)
+      .json({ success: true, message: 'Sent Verification Code' })
+  })
+})
+
+router.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*')
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept'
   )
+  next()
+})
+
+router.use((req, res, next) => {
+  const bearer = req.headers.authorization || 'Bearer '
+  const token = bearer.split(' ')[1]
+
+  if (!token) {
+    return res
+      .status(401)
+      .send({ error: { message: 'No bearer token provided' } })
+  }
+
+  return jwt.verify(token, config.secret, (err, decoded) => {
+    if (err) {
+      console.error('Failed to authenticate token', err, token)
+      return res
+        .status(401)
+        .json({ error: { message: 'Failed to authenticate  bearer token' } })
+    }
+
+    req._user = decoded
+    req._token = token
+    return next()
+  })
 })
 
 router.route('/users/self').get((req, res) => {
