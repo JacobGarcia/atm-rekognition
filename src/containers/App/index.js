@@ -54,12 +54,11 @@ class App extends PureComponent {
     })
   }
 
-  onAccess(event) {
+  onAccess = (event) => {
     event.preventDefault()
 
     const { telephone, accesCode } = this.state
-
-    NetworkOperation.authorize({ telephone, accesCode })
+    NetworkOperation.authorize(telephone.toString(), accesCode)
       .then(({ data }) => {
         localStorage.setItem('token', data.token)
 

@@ -7,6 +7,8 @@ const express = require('express')
 const router = new express.Router()
 const multer = require('multer')
 const mime = require('mime')
+const jwt = require('jsonwebtoken')
+const config = require(path.resolve('config'))
 
 var AWS = require('aws-sdk')
 // Set region
@@ -268,41 +270,104 @@ router.route('/users/signup').post(upload, (req, res) => {
   })
 })
 
+router.route('/users/sms/verifcation/authorize').post((req, res) => {
+  // Validate that no field is empty
+  const { telephone, code } = req.body
+  // Check if code matches
+  User.findOne({ telephone: '+52' + telephone }).exec((error, user) => {
+    if (error) {
+      console.error(error)
+      return res.status(500).json({
+        success: false,
+        message: 'Error while looking for user',
+      })
+    }
+
+    const token = jwt.sign(
+      {
+        _id: user._id,
+        telephone: user.telephone,
+      },
+      config.secret
+    )
+    if (parseInt(user.code, 10) === parseInt(code, 10)) return res
+        .status(200)
+        .json({ success: true, message: 'Access given successfully', token })
+    return res
+      .status(401)
+      .json({ success: false, message: 'Wrong access code' })
+  })
+})
+
 router.route('/users/sms/verifcation/send').post((req, res) => {
   // Validate that no field is empty
   const { telephone } = req.body
 
   //  Generate 4-digit code
   const code = Math.floor(Math.random() * 9000 + 1000)
-  const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
-    .publish({
-      Message: 'Your access code is ' + code /* required */,
-      PhoneNumber: '+52' + telephone,
-    })
-    .promise()
-  // Handle promise's fulfilled/rejected states
-  publishTextPromise
-    .then((data) => {
-      console.log('MessageID is ' + data.MessageId)
-    })
-    .catch((err) => {
-      console.error(err, err.stack)
-    })
 
-  return User.findOneAndUpdate({ telephone }, { $set: { code } }).exec(
-    (error) => {
-      if (error) {
-        console.error(error)
-        return res.status(500).json({
-          success: false,
-          message: 'Error while looking updating user',
-        })
-      }
-      return res
-        .status(200)
-        .json({ success: true, message: 'Sent Verification Code' })
+  User.findOneAndUpdate(
+    { telephone: '+52' + telephone },
+    { $set: { code } }
+  ).exec((error) => {
+    const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
+      .publish({
+        Message: 'Your access code is ' + code /* required */,
+        PhoneNumber: '+52' + telephone,
+      })
+      .promise()
+    // Handle promise's fulfilled/rejected states
+    publishTextPromise
+      .then((data) => {
+        console.log('MessageID is ' + data.MessageId)
+      })
+      .catch((err) => {
+        console.error(err, err.stack)
+      })
+    if (error) {
+      console.error(error)
+      return res.status(500).json({
+        success: false,
+        message: 'Error while looking updating user',
+      })
     }
+    return res
+      .status(200)
+      .json({ success: true, message: 'Sent Verification Code' })
+  })
+})
+
+router.use((req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*')
+  res.header(
+    'Access-Control-Allow-Headers',
+    'Origin, X-Requested-With, Content-Type, Accept'
   )
+  next()
+})
+
+router.use((req, res, next) => {
+  const bearer = req.headers.authorization || 'Bearer '
+  const token = bearer.split(' ')[1]
+
+  if (!token) {
+    return res
+      .status(401)
+      .send({ error: { message: 'No bearer token provided' } })
+  }
+
+  return jwt.verify(token, config.secret, (err, decoded) => {
+    if (err) {
+      console.error('Failed to authenticate token', err, token)
+      return res
+        .status(401)
+        .json({ error: { message: 'Failed to authenticate  bearer token' } })
+    }
+
+    req._user = decoded
+    req._token = token
+    return next()
+  })
 })
 
 router.route('/users/self').get((req, res) => {
