@@ -85,7 +85,7 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
     success: true,
     face: [[12, 32], [82, 21]],
     status: 200,
-    telephone: '+525581452376',
+    telephone: '+527223632083',
   }
   // Upload receipt to S3
   fs.readFile(receipt[0].path, (error, data) => {
@@ -157,7 +157,7 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
       .catch((err) => {
         console.error(err, err.stack)
       })
-    const receipt = {
+    const newreceipt = {
       institute,
       transaction,
       account,
@@ -168,7 +168,7 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
     // Add receipt to User
     return User.findOneAndUpdate(
       { telephone: response.telephone },
-      { $push: { receipts: receipt } }
+      { $push: { receipts: newreceipt } }
     ).exec((error, updatedUser) => {
       if (error) {
         console.error(error)
@@ -251,7 +251,7 @@ router.route('/users/signup').post(upload, (req, res) => {
       Key: telephone + '/' + receipt[0].filename,
     })
 
-    const receipt = {
+    const newreceipt = {
       institute,
       transaction,
       account,
@@ -263,7 +263,7 @@ router.route('/users/signup').post(upload, (req, res) => {
       ...response,
       telephone,
       atm,
-      receipts: [receipt],
+      receipts: [newreceipt],
     }
     return new User(user).save((error, user) => {
       // Save the user form

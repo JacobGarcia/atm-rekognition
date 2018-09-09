@@ -77,8 +77,8 @@ class Dashboard extends PureComponent {
               <TableHead>
                 <TableRow>
                   <TableCell>Fecha</TableCell>
-                  <TableCell numeric>Motivo</TableCell>
-                  <TableCell numeric>Cuenta</TableCell>
+                  <TableCell>Operación</TableCell>
+                  <TableCell>Cuenta</TableCell>
                   <TableCell numeric>Importe</TableCell>
                   <TableCell numeric>Folio</TableCell>
                 </TableRow>
@@ -89,7 +89,13 @@ class Dashboard extends PureComponent {
                     return (
                       <TableRow key={receipt}>
                         <TableCell component="th" scope="row">
-                          {receipt}
+                          <TableCell numeric>
+                            {receipt.timestamp.toLocaleDateString()}
+                          </TableCell>
+                          <TableCell>{receipt.transaction}</TableCell>
+                          <TableCell>{receipt.account}</TableCell>
+                          <TableCell numeric>{receipt.ammount}</TableCell>
+                          <TableCell numeric>{receipt.folio}</TableCell>
                         </TableCell>
                       </TableRow>
                     )
