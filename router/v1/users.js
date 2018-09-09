@@ -219,10 +219,13 @@ router.route('/users/signup').post(upload, (req, res) => {
     }
 
     // Get S3 URL File
+    console.log('holi')
+
     const s3url = s3.getSignedUrl('getObject', {
       Bucket: 'nonbancomerclients',
       Key: receipt[0].filename,
     })
+
     const user = {
       ...response,
       telephone,
@@ -239,16 +242,16 @@ router.route('/users/signup').post(upload, (req, res) => {
           error,
         })
       }
+      console.log(user)
 
       // Create publish parameters
       // Create promise and SNS service object
-
       const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
         .publish({
           Message:
             'Hello there! Thanks for using BBVA Bancomer services. Here is the receipt of your first transaction: ' +
             s3url /* required */,
-          PhoneNumber: response.telephone,
+          PhoneNumber: '+525581452376',
         })
         .promise()
 
@@ -302,26 +305,15 @@ router.route('/users/sms/verifcation/send').post((req, res) => {
   )
 })
 
-router.route('/users/sms/verifcation/authorize').post((req, res) => {
-  // Validate that no field is empty
-  const { telephone, code } = req.body
-
-  // Check if code matches
-  User.findOne({ telephone }).exec((error, user) => {
+router.route('/users/self').get((req, res) => {
+  User.findById(req._user._id).exec((error, user) => {
     if (error) {
       console.error(error)
-      return res.status(500).json({
-        success: false,
-        message: 'Error while looking updating user',
-      })
+      return res.status(500).json({ error })
     }
 
-    if (parseInt(user.code, 10) === parseInt(code, 10)) return res
-        .status(200)
-        .json({ success: true, message: 'Access given successfully' })
-    return res
-      .status(401)
-      .json({ success: false, message: 'Wrong access code' })
+    if (!user) return res.status(404).json({ error: { message: 'User not found' } })
+    return res.status(200).json({ user })
   })
 })
 module.exports = router

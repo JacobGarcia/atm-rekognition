@@ -9,6 +9,7 @@ import Button from '@material-ui/core/Button'
 import { createMuiTheme, MuiThemeProvider } from '@material-ui/core/styles'
 import blue from '@material-ui/core/colors/blue'
 
+import PropTypes from 'prop-types'
 import NetworkOperation from '../../lib/NetworkOperation'
 
 import './styles.pcss'
@@ -61,8 +62,6 @@ class App extends PureComponent {
     NetworkOperation.authorize({ telephone, accesCode })
       .then(({ data }) => {
         localStorage.setItem('token', data.token)
-
-        this.props.setCredentials({ ...data.user, token: data.token })
 
         this.props.history.replace(this.state.return || '/dashboard')
       })
@@ -143,6 +142,10 @@ class App extends PureComponent {
       </div>
     )
   }
+}
+
+App.propTypes = {
+  selectedType: PropTypes.string.isRequired,
 }
 
 export default App

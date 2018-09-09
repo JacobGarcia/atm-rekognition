@@ -32,6 +32,10 @@ class NetworkOperation {
       code,
     })
   }
+
+  static getSelf() {
+    return axios.get(`${baseUrl}/users/self`)
+  }
 }
 
 export default NetworkOperation

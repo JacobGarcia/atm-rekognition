@@ -4,6 +4,7 @@ const express = require('express')
 const router = new express.Router()
 
 // The next things will be protected by auth
+// router.use(require(path.resolve('router/v1/auth')))
 router.use(require(path.resolve('router/v1/users')))
 
 router.use((req, res) => {
