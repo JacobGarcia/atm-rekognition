@@ -125,7 +125,7 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
     // Get S3 URL File
     const s3url = s3.getSignedUrl('getObject', {
       Bucket: 'nonbancomerclients',
-      Key: receipt[0].filename,
+      Key: response.telephone + '/' + receipt[0].filename,
     })
 
     // Create publish parameters
@@ -223,7 +223,7 @@ router.route('/users/signup').post(upload, (req, res) => {
 
     const s3url = s3.getSignedUrl('getObject', {
       Bucket: 'nonbancomerclients',
-      Key: receipt[0].filename,
+      Key: telephone + '/' + receipt[0].filename,
     })
 
     const user = {
@@ -251,7 +251,7 @@ router.route('/users/signup').post(upload, (req, res) => {
           Message:
             'Hello there! Thanks for using BBVA Bancomer services. Here is the receipt of your first transaction: ' +
             s3url /* required */,
-          PhoneNumber: '+525581452376',
+          PhoneNumber: user.telephone,
         })
         .promise()
 
