@@ -12,6 +12,7 @@ const config = require(path.resolve('config'))
 
 var AWS = require('aws-sdk')
 var TinyURL = require('tinyurl')
+var request = require('request')
 
 // Set region
 AWS.config.update({ region: 'us-east-1' })
@@ -80,8 +81,19 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
       message: 'Malformed Request. Face or receipt not specified',
     })
 
-  // call Alejin's service for facial recognition. Now using stub
-  // use PythonShell to call python instance ?
+  // Find all users
+  // User.find({})
+  // .exec((error, users) => {
+  //   if (error) {
+  //     console.error(error)
+  //     return res
+  //       .status(500)
+  //       .json({ success: false, message: 'Could not read uploaded file' })
+  //   }
+  //   users.map((user) => {
+  //
+  //   })
+  // })
   const response = {
     user: '507f1f77bcf86cd799439011',
     success: true,
@@ -131,7 +143,7 @@ router.route('/users/recognize/one-to-many').post(upload, async (req, res) => {
       Bucket: 'noclientbancomer',
       Key: response.telephone + '/' + receipt[0].filename,
     })
-    TinyURL.shorten(s3url, (uri) => {
+    return TinyURL.shorten(s3url, (uri) => {
       // Create publish parameters
       // Create promise and SNS service object
       const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
@@ -244,73 +256,86 @@ router.route('/users/signup').post(upload, (req, res) => {
         .json({ success: false, message: 'User already registered' })
 
     // Call Python to register user
-    const response = {
-      face: [[12, 32], [82, 21]],
+    const formData = {
+      file: fs.createReadStream(photo[0].path),
     }
-
-    // Get S3 URL File
-    const s3url = s3.getSignedUrl('getObject', {
-      Bucket: 'noclientbancomer',
-      Key: telephone + '/' + receipt[0].filename,
-    })
-
-    TinyURL.shorten(s3url, (uri) => {
-      const newreceipt = {
-        institute,
-        transaction,
-        account,
-        ammount,
-        uri,
-        folio,
-      }
-      const user = {
-        ...response,
-        telephone,
-        atm,
-        receipts: [newreceipt],
-      }
-      return new User(user).save((error, user) => {
-        // Save the user form
+    request.post(
+      { url: 'http://10.10.0.248/register', formData },
+      (error, resp, body) => {
         if (error) {
           console.error(error)
           return res.status(500).json({
             success: false,
-            message: 'Error while saving user',
-            error,
+            message: 'Error while looking for user',
           })
         }
-        console.log(user)
+        const response = body
 
-        // Create publish parameters
-        // Create promise and SNS service object
-        const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
-          .publish({
-            Message:
-              institute +
-              ' - ' +
-              transaction +
-              ' - CUENTA ' +
-              account +
-              ' - ' +
-              'CANTIDAD $' +
-              ammount +
-              ' - COMPROBANTE OFICIAL ' +
-              uri /* required */,
-            PhoneNumber: user.telephone,
-          })
-          .promise()
+        // Get S3 URL File
+        const s3url = s3.getSignedUrl('getObject', {
+          Bucket: 'noclientbancomer',
+          Key: telephone + '/' + receipt[0].filename,
+        })
 
-        // Handle promise's fulfilled/rejected states
-        publishTextPromise
-          .then((data) => {
-            console.log('MessageID is ' + data.MessageId)
+        return TinyURL.shorten(s3url, (uri) => {
+          const newreceipt = {
+            institute,
+            transaction,
+            account,
+            ammount,
+            uri,
+            folio,
+          }
+          const user = {
+            ...response,
+            telephone,
+            atm,
+            receipts: [newreceipt],
+          }
+          return new User(user).save((error, user) => {
+            // Save the user form
+            if (error) {
+              console.error(error)
+              return res.status(500).json({
+                success: false,
+                message: 'Error while saving user',
+                error,
+              })
+            }
+            console.log(user)
+
+            // Create publish parameters
+            // Create promise and SNS service object
+            const publishTextPromise = new AWS.SNS({ apiVersion: '2010-03-31' })
+              .publish({
+                Message:
+                  institute +
+                  ' - ' +
+                  transaction +
+                  ' - CUENTA ' +
+                  account +
+                  ' - ' +
+                  'CANTIDAD $' +
+                  ammount +
+                  ' - COMPROBANTE OFICIAL ' +
+                  uri /* required */,
+                PhoneNumber: user.telephone,
+              })
+              .promise()
+
+            // Handle promise's fulfilled/rejected states
+            publishTextPromise
+              .then((data) => {
+                console.log('MessageID is ' + data.MessageId)
+              })
+              .catch((err) => {
+                console.error(err, err.stack)
+              })
+            return res.status(200).json({ user })
           })
-          .catch((err) => {
-            console.error(err, err.stack)
-          })
-        return res.status(200).json({ user })
-      })
-    })
+        })
+      }
+    )
   })
 })
 
